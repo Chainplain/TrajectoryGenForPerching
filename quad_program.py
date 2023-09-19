@@ -87,14 +87,20 @@ class quad_program_for_perching:
                             self.mu_jerk * jerk_square_mat +\
                             self.mu_snap * snap_square_mat
         
-        int_total_square_mat = self.Indef_int_mat(total_square_mat)
+        self. int_total_square_mat = self.Indef_int_mat(total_square_mat)
         
-        self.Q = matrix(self. subs_mat(int_total_square_mat, T_end) - self. subs_mat(int_total_square_mat, 0), tc='d')
+        self.Q = matrix(self. subs_mat(self. int_total_square_mat, T_end) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
         self.p = matrix([0.0] * (polynomial_order + 1), tc='d')
 
         self.A = []
         self.b = []
-    
+    def set_Tend(self, T_end):
+        self.Q = matrix(self. subs_mat(self. int_total_square_mat, T_end) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
+
+    def clear_constraints(self):
+        self.A = []
+        self.b = []
+        
     def add_pos_constraint_1_by_1(self, tic, pos):
         unit_pos_at_tic = self. subs_mat(self. pos_horizontal_polynomial_mat, tic)
         self.A. append( unit_pos_at_tic[0,:].tolist() )
