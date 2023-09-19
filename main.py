@@ -25,9 +25,13 @@ import matplotlib.pyplot as plt
 
 qd = QPP (7, 1)
 qd.add_pos_constraint_1_by_1(0.,0.)
+# qd.add_pos_constraint_1_by_1(0.2,-1.)
+# qd.add_pos_constraint_1_by_1(0.5,4.)
 qd.add_pos_constraint_1_by_1(1.,2.)
 qd.add_vel_constraint_1_by_1(0.,0.)
 qd.add_vel_constraint_1_by_1(1.,0.)
+# qd.add_vel_constraint_1_by_1(0.5,0.)
+qd.set_coeff(0,0,0,1)
 
 print('qd.Q: ',qd.Q)
 print('qd.A: ',qd.A)

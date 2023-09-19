@@ -54,6 +54,7 @@ class quad_program_for_perching:
         coefficients and get any polynomial we want. \n
         """
         self. t = sp.Symbol('t')
+        self.Tend = T_end
         # It is a time symbol, since the polynomial is a function of time, this is just 
         # all the symbol we need.
 
@@ -77,15 +78,15 @@ class quad_program_for_perching:
 
         print('self. pos_horizontal_polynomial_mat:', self. pos_horizontal_polynomial_mat)
         print('self. snap_horizontal_polynomial_mat:', self. snap_horizontal_polynomial_mat)
-        vel_square_mat = self. vel_horizontal_polynomial_mat.T * self. vel_horizontal_polynomial_mat
-        acc_square_mat = self. acc_horizontal_polynomial_mat.T * self. acc_horizontal_polynomial_mat
-        jerk_square_mat = self. jerk_horizontal_polynomial_mat.T * self. jerk_horizontal_polynomial_mat
-        snap_square_mat = self. snap_horizontal_polynomial_mat.T * self. snap_horizontal_polynomial_mat
+        self. vel_square_mat = self. vel_horizontal_polynomial_mat.T * self. vel_horizontal_polynomial_mat
+        self. acc_square_mat = self. acc_horizontal_polynomial_mat.T * self. acc_horizontal_polynomial_mat
+        self. jerk_square_mat = self. jerk_horizontal_polynomial_mat.T * self. jerk_horizontal_polynomial_mat
+        self. snap_square_mat = self. snap_horizontal_polynomial_mat.T * self. snap_horizontal_polynomial_mat
 
-        total_square_mat =  self.mu_vel * vel_square_mat +\
-                            self.mu_acc * acc_square_mat +\
-                            self.mu_jerk * jerk_square_mat +\
-                            self.mu_snap * snap_square_mat
+        total_square_mat =  self.mu_vel * self. vel_square_mat +\
+                            self.mu_acc * self. acc_square_mat +\
+                            self.mu_jerk * self. jerk_square_mat +\
+                            self.mu_snap * self. snap_square_mat
         
         self. int_total_square_mat = self.Indef_int_mat(total_square_mat)
         
@@ -95,7 +96,24 @@ class quad_program_for_perching:
         self.A = []
         self.b = []
     def set_Tend(self, T_end):
-        self.Q = matrix(self. subs_mat(self. int_total_square_mat, T_end) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
+        self.Tend  = T_end
+        self.Q = matrix(self. subs_mat(self. int_total_square_mat, self.Tend) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
+
+    def set_coeff(self, m_vel, m_acc, m_jerk, m_snap):
+        self.mu_vel = m_vel
+        self.mu_acc = m_acc
+        self.mu_jerk = m_jerk
+        self.mu_snap = m_snap
+
+        total_square_mat =  self.mu_vel * self. vel_square_mat +\
+                            self.mu_acc * self. acc_square_mat +\
+                            self.mu_jerk * self. jerk_square_mat +\
+                            self.mu_snap * self. snap_square_mat
+        
+        self. int_total_square_mat = self.Indef_int_mat(total_square_mat)
+        
+        self.Q = matrix(self. subs_mat(self. int_total_square_mat, self.Tend) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
+        
 
     def clear_constraints(self):
         self.A = []
