@@ -55,6 +55,7 @@ class quad_program_for_perching:
         """
         self. t = sp.Symbol('t')
         self.Tend = T_end
+        self.poly_order = polynomial_order
         # It is a time symbol, since the polynomial is a function of time, this is just 
         # all the symbol we need.
 
@@ -69,75 +70,141 @@ class quad_program_for_perching:
         # horizontal_polynomial_mat shown as  [[Poly(1.0*t**2, t, domain='RR') Poly(1.0*t, t, domain='RR')
         # Poly(1.0, t, domain='RR')]] 
         self. pos_horizontal_polynomial_mat = np.mat( list_of_unit_polynomials )
-        
+        # print('self. pos_horizontal_polynomial_mat:', self. pos_horizontal_polynomial_mat)
         self. vel_horizontal_polynomial_mat = self.diff_mat(self. pos_horizontal_polynomial_mat)
         # print('self. vel_horizontal_polynomial_mat:', self. vel_horizontal_polynomial_mat)
         self. acc_horizontal_polynomial_mat = self.diff_mat(self. vel_horizontal_polynomial_mat)
         self. jerk_horizontal_polynomial_mat = self.diff_mat(self. acc_horizontal_polynomial_mat)
         self. snap_horizontal_polynomial_mat = self.diff_mat(self. jerk_horizontal_polynomial_mat)
 
-        print('self. pos_horizontal_polynomial_mat:', self. pos_horizontal_polynomial_mat)
-        print('self. snap_horizontal_polynomial_mat:', self. snap_horizontal_polynomial_mat)
-        self. vel_square_mat = self. vel_horizontal_polynomial_mat.T * self. vel_horizontal_polynomial_mat
-        self. acc_square_mat = self. acc_horizontal_polynomial_mat.T * self. acc_horizontal_polynomial_mat
-        self. jerk_square_mat = self. jerk_horizontal_polynomial_mat.T * self. jerk_horizontal_polynomial_mat
-        self. snap_square_mat = self. snap_horizontal_polynomial_mat.T * self. snap_horizontal_polynomial_mat
+        # print('self. pos_horizontal_polynomial_mat:', self. pos_horizontal_polynomial_mat)
+        # print('self. snap_horizontal_polynomial_mat:', self. snap_horizontal_polynomial_mat)
+        self. vel_square_mat = self.Calc_Q(self.t, 1)
+        self. acc_square_mat =  self.Calc_Q(self.t, 2)
+        self. jerk_square_mat =  self.Calc_Q(self.t, 3)
+        self. snap_square_mat =  self.Calc_Q(self.t, 4)
 
-        total_square_mat =  self.mu_vel * self. vel_square_mat +\
-                            self.mu_acc * self. acc_square_mat +\
-                            self.mu_jerk * self. jerk_square_mat +\
-                            self.mu_snap * self. snap_square_mat
+        # print('self. vel_square_mat:',self. vel_square_mat)
+        self. int_total_square_mat= self.mu_vel * self. vel_square_mat +\
+                                    self.mu_acc * self. acc_square_mat +\
+                                    self.mu_jerk * self. jerk_square_mat +\
+                                    self.mu_snap * self. snap_square_mat
         
-        self. int_total_square_mat = self.Indef_int_mat(total_square_mat)
-        
-        self.Q = matrix(self. subs_mat(self. int_total_square_mat, T_end) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
+
+        self.Q = matrix(self. subs_mat(self. int_total_square_mat, self.Tend) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
         self.p = matrix([0.0] * (polynomial_order + 1), tc='d')
 
         self.A = []
         self.b = []
+        self.G = []
+        self.h = []
+
     def set_Tend(self, T_end):
         self.Tend  = T_end
         self.Q = matrix(self. subs_mat(self. int_total_square_mat, self.Tend) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
 
     def set_coeff(self, m_vel, m_acc, m_jerk, m_snap):
-        self.mu_vel = m_vel
-        self.mu_acc = m_acc
-        self.mu_jerk = m_jerk
-        self.mu_snap = m_snap
+        if m_vel is not None:
+            self.mu_vel = m_vel
+        if m_acc is not None:
+            self.mu_acc = m_acc
+        if m_jerk is not None:
+            self.mu_jerk = m_jerk 
+        if m_snap is not None:  
+            self.mu_snap = m_snap
 
-        total_square_mat =  self.mu_vel * self. vel_square_mat +\
-                            self.mu_acc * self. acc_square_mat +\
-                            self.mu_jerk * self. jerk_square_mat +\
-                            self.mu_snap * self. snap_square_mat
-        
-        self. int_total_square_mat = self.Indef_int_mat(total_square_mat)
-        
+        self. int_total_square_mat= self.mu_vel * self. vel_square_mat +\
+                                    self.mu_acc * self. acc_square_mat +\
+                                    self.mu_jerk * self. jerk_square_mat +\
+                                    self.mu_snap * self. snap_square_mat
+        # print('self. int_total_square_mat:',self. int_total_square_mat)
+
         self.Q = matrix(self. subs_mat(self. int_total_square_mat, self.Tend) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
-        
+
+    def Calc_Q(self,ssymbol, opt_order):
+        if not (opt_order == 1 or opt_order == 2 or \
+                opt_order == 3 or opt_order == 4):
+            raise ValueError("Opt_order must be 1, 2, 3, and 4.")
+        t = ssymbol
+        output_mat = np.tile( t,(self.poly_order+1, self.poly_order+1))
+        for l in range(self.poly_order+1):
+            for k in range(self.poly_order+1):
+                if l >= opt_order and k >= opt_order:
+                    gain = 1.0
+                    for m in range(opt_order):
+                        gain = gain * float(l - m) * float(k - m)
+                    output_mat[self.poly_order-l,self.poly_order-k]=gain /float(l + k - 2 * opt_order + 1) \
+                        * t ** float(l + k - 2 * opt_order + 1)
+                else:
+                    output_mat[self.poly_order-l,self.poly_order-k]=0. * t
+        return output_mat
 
     def clear_constraints(self):
         self.A = []
         self.b = []
+        self.G = []
+        self.h = []
         
     def add_pos_constraint_1_by_1(self, tic, pos):
         unit_pos_at_tic = self. subs_mat(self. pos_horizontal_polynomial_mat, tic)
         self.A. append( unit_pos_at_tic[0,:].tolist() )
         self.b. append( pos )
+    def add_upper_pos_constraint_1_by_1(self, tic, pos):
+        unit_pos_at_tic = self. subs_mat(self. pos_horizontal_polynomial_mat, tic)
+        self.G. append( unit_pos_at_tic[0,:].tolist() )
+        self.h. append( pos )
+    def add_lower_pos_constraint_1_by_1(self, tic, pos):
+        unit_pos_at_tic = self. subs_mat(self. pos_horizontal_polynomial_mat, tic)
+        self.G. append( (-unit_pos_at_tic[0,:]).tolist() )
+        self.h. append( -pos )
+    def add_symmetry_pos_constraint_1_by_1(self, tic, pos):
+        self.add_upper_pos_constraint_1_by_1(tic, pos)
+        self.add_lower_pos_constraint_1_by_1(tic, pos)
 
     def add_vel_constraint_1_by_1(self, tic, vel):
         unit_vel_at_tic = self. subs_mat(self. vel_horizontal_polynomial_mat, tic)
         self.A. append( unit_vel_at_tic[0,:].tolist() )
         self.b. append( vel )
+    def add_upper_vel_constraint_1_by_1(self, tic, vel):
+        unit_vel_at_tic = self. subs_mat(self. vel_horizontal_polynomial_mat, tic)
+        self.G. append( unit_vel_at_tic[0,:].tolist() )
+        self.h. append( vel )
+    def add_lower_vel_constraint_1_by_1(self, tic, vel):
+        unit_vel_at_tic = self. subs_mat(self. vel_horizontal_polynomial_mat, tic)
+        self.G. append( (-unit_vel_at_tic[0,:]).tolist() )
+        self.h. append( -vel )
+    def add_symmetry_vel_constraint_1_by_1(self, tic, vel_abs):
+        self.add_upper_vel_constraint_1_by_1(tic, vel_abs)
+        self.add_lower_vel_constraint_1_by_1(tic, -vel_abs)
 
     def add_acc_constraint_1_by_1(self, tic, acc):
         unit_acc_at_tic = self. subs_mat(self. acc_horizontal_polynomial_mat, tic)
         self.A. append( unit_acc_at_tic[0,:].tolist() )
         self.b. append( acc )
+    def add_upper_acc_constraint_1_by_1(self, tic, acc):
+        unit_acc_at_tic = self. subs_mat(self. acc_horizontal_polynomial_mat, tic)
+        self.G. append( unit_acc_at_tic[0,:].tolist() )
+        self.h. append( acc )
+    def add_lower_acc_constraint_1_by_1(self, tic, acc):
+        unit_acc_at_tic = self. subs_mat(self. acc_horizontal_polynomial_mat, tic)
+        self.G. append((-unit_acc_at_tic[0,:]).tolist() )
+        self.h. append( -acc )
+    def add_symmetry_acc_constraint_1_by_1(self, tic, acc_abs):
+        self.add_upper_acc_constraint_1_by_1(tic, acc_abs)
+        self.add_lower_acc_constraint_1_by_1(tic, -acc_abs)
 
     def opt(self):
         A_mat = matrix(np.mat(self.A))
         b_mat = matrix(np.mat(self.b).T)
-        sol=solvers.qp(self.Q, self.p, None, None, A_mat, b_mat)
+        if  not len(self.G):
+            sol=solvers.qp(self.Q, self.p, None, None, A_mat, b_mat)
+        else:
+            G_mat = matrix(np.mat(self.G))
+            h_mat = matrix(np.mat(self.h).T)
+            sol=solvers.qp(self.Q, self.p, G_mat, h_mat, A_mat, b_mat)
+
+
+
         return sol['x']
 
     def diff_mat(self, symbol_mat):
