@@ -61,7 +61,7 @@ class quad_program_for_perching:
         list_of_unit_polynomials = []
         # Here we initialize them.
         for i in range(polynomial_order + 1):
-            single_polynomial = self.t  ** (polynomial_order  - i)
+            single_polynomial = sp.Poly.from_list( marker_for_unit_polynomial[i,:], self.t)
             list_of_unit_polynomials.append(single_polynomial)
 
         # horizontal_polynomial_mat shown as  [[Poly(1.0*t**2, t, domain='RR') Poly(1.0*t, t, domain='RR')
@@ -76,18 +76,17 @@ class quad_program_for_perching:
 
         # print('self. pos_horizontal_polynomial_mat:', self. pos_horizontal_polynomial_mat)
         # print('self. snap_horizontal_polynomial_mat:', self. snap_horizontal_polynomial_mat)
-        self. int_vel_square_mat = self.Calc_SQ(self. vel_horizontal_polynomial_mat)
-        self. int_acc_square_mat =  self.Calc_SQ(self. acc_horizontal_polynomial_mat)
-        self. int_jerk_square_mat =  self.Calc_SQ(self. jerk_horizontal_polynomial_mat)
-        self. int_snap_square_mat =  self.Calc_SQ(self. snap_horizontal_polynomial_mat)
+        self. vel_square_mat = self.Calc_SQ(self.t, 1)
+        self. acc_square_mat =  self.Calc_SQ(self.t, 2)
+        self. jerk_square_mat =  self.Calc_SQ(self.t, 3)
+        self. snap_square_mat =  self.Calc_SQ(self.t, 4)
 
         # print('self. vel_square_mat:',self. vel_square_mat)
-        self. int_total_square_mat= self.mu_vel * self. int_vel_square_mat +\
-                                    self.mu_acc * self. int_acc_square_mat +\
-                                    self.mu_jerk * self. int_jerk_square_mat +\
-                                    self.mu_snap * self. int_snap_square_mat
+        self. int_total_square_mat= self.mu_vel * self. vel_square_mat +\
+                                    self.mu_acc * self. acc_square_mat +\
+                                    self.mu_jerk * self. jerk_square_mat +\
+                                    self.mu_snap * self. snap_square_mat
         
-        print('self. int_total_square_mat:',self. int_total_square_mat)
 
         self.Q = matrix( self. subs_mat(self. int_total_square_mat, self.Tend) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
         self.p = matrix([0.0] * (polynomial_order + 1), tc='d')
@@ -107,7 +106,7 @@ class quad_program_for_perching:
     def add_ob_at_t(self, ob_p, mu, t):
         pos_mat = self. subs_mat(self. pos_horizontal_polynomial_mat, t)
         Q_add = - matrix( pos_mat. T * pos_mat ) #* (self.Tend - self.t) / self.Tend 
-        p_add =   matrix( ob_p * pos_mat.T , tc='d')  #* (self.Tend - self.t) / self.Tend 
+        p_add =    matrix( ob_p * pos_mat.T , tc='d')  #* (self.Tend - self.t) / self.Tend 
         self.Q = self.Q + mu * Q_add
         self.p = self.p + mu * p_add
 
@@ -132,19 +131,32 @@ class quad_program_for_perching:
         if m_snap is not None:  
             self.mu_snap = m_snap
 
-        self. int_total_square_mat= self.mu_vel * self. int_vel_square_mat +\
-                                    self.mu_acc * self. int_acc_square_mat +\
-                                    self.mu_jerk * self. int_jerk_square_mat +\
-                                    self.mu_snap * self. int_snap_square_mat
+        self. int_total_square_mat= self.mu_vel * self. vel_square_mat +\
+                                    self.mu_acc * self. acc_square_mat +\
+                                    self.mu_jerk * self. jerk_square_mat +\
+                                    self.mu_snap * self. snap_square_mat
         # print('self. int_total_square_mat:',self. int_total_square_mat)
 
         self.Q = matrix(self. subs_mat(self. int_total_square_mat, self.Tend) - self. subs_mat(self. int_total_square_mat, 0), tc='d')
         # print('Q at set:', self.Q)
 
-    def Calc_SQ(self, horizontal_vec):
-        Transpose_mul_origin_Mat = horizontal_vec.T @ horizontal_vec
-        Int_Mat = self.Indef_int_mat(Transpose_mul_origin_Mat)
-        return Int_Mat
+    def Calc_SQ(self,ssymbol, opt_order):
+        if not (opt_order == 1 or opt_order == 2 or \
+                opt_order == 3 or opt_order == 4):
+            raise ValueError("Opt_order must be 1, 2, 3, and 4.")
+        t = ssymbol
+        output_mat = np.tile( t,(self.poly_order+1, self.poly_order+1))
+        for l in range(self.poly_order+1):
+            for k in range(self.poly_order+1):
+                if l >= opt_order and k >= opt_order:
+                    gain = 1.0
+                    for m in range(opt_order):
+                        gain = gain * float(l - m) * float(k - m)
+                    output_mat[self.poly_order-l,self.poly_order-k]=gain /float(l + k - 2 * opt_order + 1) \
+                        * t ** float(l + k - 2 * opt_order + 1)
+                else:
+                    output_mat[self.poly_order-l,self.poly_order-k]=0. * t
+        return output_mat
 
     def clear_constraints(self):
         self.A = []
@@ -210,8 +222,8 @@ class quad_program_for_perching:
 
     def opt(self):
         # solvers.options['show_progress'] = False
-        A_mat = matrix(np.mat(self.A) , tc='d')
-        b_mat = matrix(np.mat(self.b).T , tc='d')
+        A_mat = matrix(np.mat(self.A))
+        b_mat = matrix(np.mat(self.b).T)
 
         print('Q:', self.Q)
         print('p:', self.p)
@@ -220,8 +232,8 @@ class quad_program_for_perching:
         if  not len(self.G):
             sol=solvers.qp(self.Q, self.p, None, None, A=A_mat, b=b_mat)
         else:
-            G_mat = matrix(np.mat(self.G) , tc='d')
-            h_mat = matrix(np.mat(self.h).T , tc='d')
+            G_mat = matrix(np.mat(self.G))
+            h_mat = matrix(np.mat(self.h).T)
             
 
             sol=solvers.qp(self.Q, self.p, G_mat, h_mat, A_mat, b_mat)
@@ -248,7 +260,7 @@ class quad_program_for_perching:
         [row,col]  = output_mat.shape
         for i in range(row):
             for j in range(col):
-                output_mat[i,j] = sp.integrate( symbol_mat[i,j] , self. t)
+                output_mat[i,j] = sp.Poly.integrate( symbol_mat[i,j] , self. t)
         return output_mat
     
     def subs_mat(self, the_mat, value):

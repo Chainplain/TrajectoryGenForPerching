@@ -1,11 +1,13 @@
 cmap =['#4b1a93';'#1a2293';'#1a6893';...
         '#1a9375';'#1a931e';'#85931a';...
         '#93801a';'#d9b045';'#d98d45'];
+    
+constraint_color = '#8B658B';
 kk = figure;
 kk.Position = [100 100 500 500];
 
 hold on;
-Name = 'Coef_0_1_0_0_OptResTraj';
+Name = 'Coef_1_1_1_1_OptResTraj';
 for i = 1 : 9 
     file_name = Name + string(i) + ".mat";
     load(file_name);
@@ -21,6 +23,7 @@ for i = 1 : 9
         'MarkerSize', 10,'MarkerFaceColor', 'white', 'MarkerEdgeColor', '#CD2626','LineWidth', 1);
 end
 grid on;
+box on;
 axis equal;
 xlim([-1.6, 0.1])
 ylim([-0.8, 0.8])
@@ -37,9 +40,12 @@ for i = 1 : 9
     x_vel_raw = linspace(7,0,8)'.* x_poly_res;
     x_vel = x_vel_raw(1:end-1);
     x = polyval(x_vel, time);
-    ylim([0.15, 0.5])
+    ylim([0.05, 0.45])
     plot(time, x, 'Color', cmap(i,:), 'LineWidth', 1.2);
 end
+plot(time, vel_con_upp * ones(size(time)),'--', 'Color',constraint_color , 'LineWidth', 1.2);
+plot(time, vel_con_low * ones(size(time)),'--', 'Color',constraint_color , 'LineWidth', 1.2);
+box on;
 
 subplot(3,1,2);
 hold on;
@@ -53,6 +59,10 @@ for i = 1 : 9
     ylim([-0.3, 0.3])
     plot(time, y , 'Color', cmap(i,:), 'LineWidth', 1.2);
 end
+box on;
+
+plot(time, vel_con * ones(size(time)),'--', 'Color',constraint_color , 'LineWidth', 1.2);
+plot(time, -vel_con * ones(size(time)),'--', 'Color',constraint_color , 'LineWidth', 1.2);
 
 subplot(3,1,3);
 hold on;
@@ -66,3 +76,7 @@ for i = 1 : 9
     ylim([-0.3, 0.3])
     plot(time, z, 'Color', cmap(i,:), 'LineWidth', 1.2);
 end
+
+plot(time, vel_con * ones(size(time)),'--', 'Color',constraint_color , 'LineWidth', 1.2);
+plot(time, -vel_con * ones(size(time)),'--', 'Color',constraint_color , 'LineWidth', 1.2);
+box on;
